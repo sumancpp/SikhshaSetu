@@ -11,7 +11,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().default('c36d299fb58f96e451372cf0175b9e075c32890632b7e5a6f238dfcae60f2529'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().default('https://sikhshasetu-frontend.onrender.com'),
   ADMIN_EMAIL: z.string().email().default('admin@shikshasetu.edu'),
   ADMIN_PASSWORD: z.string().default('Admin@123456'),
   GOOGLE_CLIENT_ID: z.string().default(''),
