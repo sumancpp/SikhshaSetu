@@ -17,6 +17,8 @@ import {
   Swords,
   Terminal,
   X,
+  QrCode,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils/helpers';
@@ -35,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       title: 'Overview',
       items: [
         { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+        { label: 'Live Attendance 📍', to: '/attendance', icon: QrCode },
         { label: 'Classes', to: '/classes', icon: Layers },
         { label: 'Subjects', to: '/subjects', icon: BookOpen },
       ],

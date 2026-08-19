@@ -21,6 +21,7 @@ import { ModerationReportsPage } from '../pages/admin/ModerationReportsPage';
 import { AuditLogsPage } from '../pages/admin/AuditLogsPage';
 import { QuizArenaPage } from '../pages/arena/QuizArenaPage';
 import { CodePlaygroundPage } from '../pages/playground/CodePlaygroundPage';
+import { AttendanceHubPage } from '../pages/attendance/AttendanceHubPage';
 import { NotFoundPage } from '../pages/notfound/NotFoundPage';
 import { Skeleton } from '../components/common/Skeleton';
 
@@ -73,6 +74,7 @@ export const AppRoutes: React.FC = () => {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardRouter />} />
+        <Route path="attendance" element={<AttendanceHubPage />} />
 
         {/* Classes */}
         <Route path="classes" element={<ClassesPage />} />

@@ -13,6 +13,8 @@ import {
   ArrowRight,
   Sparkles,
   Award,
+  QrCode,
+  MapPin,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -61,16 +63,26 @@ export const FacultyDashboard: React.FC = () => {
     <div className="space-y-8">
       {/* Faculty Hero Banner */}
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-700 text-white p-4 sm:p-6 md:p-8 shadow-xl">
-        <div className="relative z-10 space-y-2">
-          <Badge variant="blue" className="bg-white/20 text-white border-white/30 text-xs">
-            Faculty Workspace
-          </Badge>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Welcome, {user?.name}
-          </h2>
-          <p className="text-xs sm:text-sm text-blue-100 max-w-xl">
-            Manage course materials, assign homework, configure automated MCQ quizzes, evaluate submissions, and mentor students.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-2">
+            <Badge variant="blue" className="bg-white/20 text-white border-white/30 text-xs">
+              Faculty Workspace
+            </Badge>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+              Welcome, {user?.name}
+            </h2>
+            <p className="text-xs sm:text-sm text-blue-100 max-w-xl">
+              Manage course materials, assign homework, configure automated MCQ quizzes, evaluate submissions, and take GPS-verified attendance.
+            </p>
+          </div>
+
+          <Button
+            onClick={() => navigate('/attendance')}
+            className="bg-white hover:bg-blue-50 text-indigo-900 border-none font-bold text-xs shadow-lg shrink-0"
+            leftIcon={<QrCode className="w-4 h-4 text-indigo-600" />}
+          >
+            🚀 Launch Live Attendance
+          </Button>
         </div>
       </div>
 
