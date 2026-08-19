@@ -58,6 +58,32 @@ export const attendanceApi = {
     return res.data;
   },
 
+  // Faculty: Start a 5-minute dynamic attendance session for a subject with GPS
+  createSubjectSession: async (
+    subjectId: string,
+    data: {
+      title?: string;
+      centerLatitude: number;
+      centerLongitude: number;
+      allowedRadiusMeters?: number;
+      durationMinutes?: number;
+    }
+  ): Promise<ApiResponse<AttendanceSession>> => {
+    const res = await apiClient.post<ApiResponse<AttendanceSession>>(
+      `/attendance/subject/${subjectId}/session`,
+      data
+    );
+    return res.data;
+  },
+
+  // Faculty / Student: Get subject attendance sessions history
+  getSubjectHistory: async (subjectId: string): Promise<ApiResponse<AttendanceSession[]>> => {
+    const res = await apiClient.get<ApiResponse<AttendanceSession[]>>(
+      `/attendance/subject/${subjectId}/history`
+    );
+    return res.data;
+  },
+
   // Faculty / Student: Get class attendance sessions history
   getClassHistory: async (classId: string): Promise<ApiResponse<AttendanceSession[]>> => {
     const res = await apiClient.get<ApiResponse<AttendanceSession[]>>(
@@ -80,9 +106,10 @@ export const attendanceApi = {
   },
 
   // Student: Get personal attendance logs
-  getStudentHistory: async (
-    classId?: string
-  ): Promise<
+  getStudentHistory: async (params?: {
+    classId?: string;
+    subjectId?: string;
+  }): Promise<
     ApiResponse<{
       records: AttendanceRecord[];
       totalPresent: number;
@@ -96,7 +123,7 @@ export const attendanceApi = {
         attendancePercentage: number;
       }>
     >('/attendance/student/my-history', {
-      params: { classId },
+      params,
     });
     return res.data;
   },

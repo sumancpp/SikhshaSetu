@@ -12,6 +12,7 @@ import { AiFlashcardsDeck } from '../../components/ai/AiFlashcardsDeck';
 import { AiQuizGeneratorModal } from '../../components/ai/AiQuizGeneratorModal';
 import { AtRiskStudentDashboard } from '../../components/analytics/AtRiskStudentDashboard';
 import { StudentAcademicHealthCard } from '../../components/analytics/StudentAcademicHealthCard';
+import { SubjectAttendanceTab } from '../../components/subjects/SubjectAttendanceTab';
 import { useExamIntegrityGuard } from '../../hooks/useExamIntegrityGuard';
 import { ExamProctorGuard } from '../../components/common/ExamProctorGuard';
 import { Card } from '../../components/common/Card';
@@ -58,6 +59,7 @@ import {
   Percent,
   AlertTriangle,
   ShieldCheck,
+  MapPin,
 } from 'lucide-react';
 
 export const SubjectWorkspacePage: React.FC = () => {
@@ -740,6 +742,7 @@ export const SubjectWorkspacePage: React.FC = () => {
             { id: 'materials', label: 'Study Materials', count: materials.length, icon: <BookOpen className="w-4 h-4" /> },
             { id: 'assignments', label: 'Assignments', count: assignments.length, icon: <FileText className="w-4 h-4" /> },
             { id: 'quizzes', label: 'Quizzes', count: quizzes.length, icon: <HelpCircle className="w-4 h-4" /> },
+            { id: 'attendance', label: 'Live Attendance', icon: <MapPin className="w-4 h-4 text-emerald-500" /> },
             { id: 'ai-tutor', label: 'AI Knowledge Tutor', icon: <Sparkles className="w-4 h-4 text-purple-500" /> },
             ...(isFacultyOrAdmin
               ? [{ id: 'at-risk', label: 'At-Risk Radar', icon: <AlertTriangle className="w-4 h-4 text-red-500" /> }]
@@ -1238,6 +1241,11 @@ export const SubjectWorkspacePage: React.FC = () => {
             <AiFlashcardsDeck subject={subject} />
           )}
         </div>
+      )}
+
+      {/* ===================== TAB: SUBJECT ATTENDANCE ===================== */}
+      {activeTab === 'attendance' && subject && (
+        <SubjectAttendanceTab subject={subject} />
       )}
 
       {/* ===================== TAB: AT-RISK ANALYTICS ===================== */}

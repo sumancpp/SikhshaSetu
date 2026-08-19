@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Eye,
   CameraOff,
+  ExternalLink,
 } from 'lucide-react';
 
 interface DynamicQrAttendanceModalProps {
@@ -355,7 +356,7 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
                   return (
                     <div
                       key={rec._id}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
+                      className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
                         isPresent
                           ? 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-900/60 shadow-sm'
                           : 'bg-red-50/60 dark:bg-red-950/40 border-red-200 dark:border-red-900/60'
@@ -367,7 +368,7 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
                           name={rec.studentId?.name || 'Student'}
                           size="sm"
                         />
-                        <div>
+                        <div className="space-y-0.5">
                           <div className="font-bold text-xs text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                             {rec.studentId?.name}
                             {rec.studentId?.studentId && (
@@ -376,18 +377,35 @@ export const DynamicQrAttendanceModal: React.FC<DynamicQrAttendanceModalProps> =
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                          <div className="text-[10px] text-gray-400 flex items-center gap-2 flex-wrap">
                             <span>{new Date(rec.scannedAt).toLocaleTimeString()}</span>
                             <span>•</span>
-                            <span className="flex items-center gap-0.5">
-                              <MapPin className="w-3 h-3 text-indigo-500" />
+                            <span className="font-mono text-gray-600 dark:text-gray-300">
+                              📍 ({rec.latitude?.toFixed(4)}, {rec.longitude?.toFixed(4)})
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-0.5 font-semibold text-indigo-600 dark:text-indigo-400">
                               {Math.round(rec.distanceFromCenter)}m away
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {rec.latitude && rec.longitude && (
+                          <a
+                            href={`https://www.google.com/maps?q=${rec.latitude},${rec.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/80 px-2 py-1 rounded-lg font-bold transition-colors"
+                            title="View exact live student GPS coordinates on Google Maps"
+                          >
+                            <MapPin className="w-3 h-3 text-blue-500" />
+                            <span>View Pin</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+
                         {isPresent ? (
                           <Badge variant="emerald" className="text-[10px] font-bold">
                             ✅ Verified

@@ -102,6 +102,57 @@ export class AttendanceController {
     }
   }
 
+  static async createSubjectSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { subjectId } = req.params;
+      const { title, centerLatitude, centerLongitude, allowedRadiusMeters, durationMinutes } =
+        req.body;
+
+      if (centerLatitude === undefined || centerLongitude === undefined) {
+        res.status(400).json({
+          success: false,
+          message: 'Classroom GPS Coordinates (Latitude and Longitude) are required.',
+        });
+        return;
+      }
+
+      const session = await AttendanceService.createSubjectSession(
+        req.user!.id,
+        req.user!.role,
+        subjectId,
+        {
+          title,
+          centerLatitude: Number(centerLatitude),
+          centerLongitude: Number(centerLongitude),
+          allowedRadiusMeters: allowedRadiusMeters ? Number(allowedRadiusMeters) : 100,
+          durationMinutes: durationMinutes ? Number(durationMinutes) : 5,
+        }
+      );
+
+      res.status(201).json({
+        success: true,
+        message: '5-minute Subject Dynamic Attendance session started successfully.',
+        data: session,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async getSubjectHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { subjectId } = req.params;
+      const history = await AttendanceService.getSubjectAttendanceHistory(subjectId);
+
+      res.status(200).json({
+        success: true,
+        data: history,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async getClassHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { classId } = req.params;
@@ -118,10 +169,11 @@ export class AttendanceController {
 
   static async getStudentHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { classId } = req.query;
+      const { classId, subjectId } = req.query;
       const history = await AttendanceService.getStudentAttendanceHistory(
         req.user!.id,
-        classId as string
+        classId as string,
+        subjectId as string
       );
 
       res.status(200).json({

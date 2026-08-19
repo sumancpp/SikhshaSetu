@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { attendanceApi } from '../../api/attendance.api';
-import { AttendanceSession, AttendanceRecord } from '../../types';
+import { AttendanceSession, AttendanceRecord, Subject } from '../../types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -23,14 +23,14 @@ import {
   ShieldCheck,
   Calendar,
   Percent,
+  ExternalLink,
 } from 'lucide-react';
 
-interface ClassAttendanceTabProps {
-  classId: string;
-  className: string;
+interface SubjectAttendanceTabProps {
+  subject: Subject;
 }
 
-export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId, className }) => {
+export const SubjectAttendanceTab: React.FC<SubjectAttendanceTabProps> = ({ subject }) => {
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [studentHistory, setStudentHistory] = useState<{
     records: AttendanceRecord[];
@@ -45,10 +45,14 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Faculty session form
-  const [sessionTitle, setSessionTitle] = useState(`${className} - Attendance`);
+  const [sessionTitle, setSessionTitle] = useState(
+    `${subject.name} (${subject.code}) - Lecture Attendance`
+  );
   const [radiusMeters, setRadiusMeters] = useState(100);
   const [durationMinutes, setDurationMinutes] = useState(5);
-  const [facultyCoords, setFacultyCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [facultyCoords, setFacultyCoords] = useState<{ latitude: number; longitude: number } | null>(
+    null
+  );
   const [locatingFaculty, setLocatingFaculty] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
 
@@ -61,12 +65,12 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
     try {
       setLoading(true);
       if (isFacultyOrAdmin) {
-        const res = await attendanceApi.getClassHistory(classId);
+        const res = await attendanceApi.getSubjectHistory(subject._id);
         if (res.success) {
           setSessions(res.data);
         }
       } else {
-        const res = await attendanceApi.getStudentHistory({ classId });
+        const res = await attendanceApi.getStudentHistory({ subjectId: subject._id });
         if (res.success) {
           setStudentHistory(res.data);
         }
@@ -80,7 +84,7 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
 
   useEffect(() => {
     fetchData();
-  }, [classId, isFacultyOrAdmin]);
+  }, [subject._id, isFacultyOrAdmin]);
 
   // Acquire Faculty's current GPS location
   const acquireFacultyGps = () => {
@@ -97,11 +101,14 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
           longitude: pos.coords.longitude,
         });
         setLocatingFaculty(false);
-        info('GPS Acquired', `Classroom location locked: (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
+        info(
+          'Classroom Coordinates Locked',
+          `GPS locked: (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`
+        );
       },
       (err) => {
         setLocatingFaculty(false);
-        error('GPS Error', err.message || 'Please enable location access in browser.');
+        error('GPS Error', err.message || 'Please enable location access in your browser.');
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -111,14 +118,14 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
     e.preventDefault();
 
     if (!facultyCoords) {
-      error('Location Required', 'Please acquire classroom GPS location before starting the attendance session.');
+      error('Location Required', 'Please lock classroom GPS coordinates before starting session.');
       acquireFacultyGps();
       return;
     }
 
     setCreatingSession(true);
     try {
-      const res = await attendanceApi.createSession(classId, {
+      const res = await attendanceApi.createSubjectSession(subject._id, {
         title: sessionTitle.trim(),
         centerLatitude: facultyCoords.latitude,
         centerLongitude: facultyCoords.longitude,
@@ -130,7 +137,7 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
         setIsStartSessionOpen(false);
         setActiveQrSession(res.data);
         fetchData();
-        success('Session Started!', '5-minute Dynamic QR Attendance is now live.');
+        success('Subject Attendance Live!', '5-minute dynamic QR code is now active on screen.');
       }
     } catch (err: any) {
       error('Failed to start session', err.response?.data?.message);
@@ -147,14 +154,16 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Badge variant="blue" className="bg-indigo-600 text-white text-xs">
-                Anti-Cheat Geolocation Verified
+                {subject.code} Attendance Hub
               </Badge>
-              <span className="text-xs text-indigo-200">5-Min Rotating Dynamic QR</span>
+              <span className="text-xs text-indigo-200">Anti-Proxy Rotating Dynamic QR</span>
             </div>
-            <h2 className="text-2xl font-black tracking-tight">Smart Classroom Attendance</h2>
+            <h2 className="text-2xl font-black tracking-tight">
+              {subject.name} - Subject Attendance
+            </h2>
             <p className="text-xs text-indigo-200 max-w-xl">
-              Cryptographically signed dynamic QR code updates every 10 seconds. Real-time GPS verification prevents
-              proxy attendance and screenshot forwarding.
+              Track lecture attendance for {subject.name}. Faculty and Admins can view the live student roster
+              with exact verified GPS coordinates and Google Maps pin locations.
             </p>
           </div>
 
@@ -168,7 +177,7 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
                 leftIcon={<QrCode className="w-4 h-4" />}
                 className="shadow-lg shadow-indigo-500/30 text-xs font-bold"
               >
-                🚀 Start Dynamic QR Session
+                🚀 Start Subject QR Session
               </Button>
             ) : (
               <Button
@@ -188,7 +197,7 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="p-4 border-l-4 border-l-emerald-500 flex items-center justify-between">
             <div>
-              <span className="text-xs text-gray-400 font-semibold">Attendance Rate</span>
+              <span className="text-xs text-gray-400 font-semibold">Subject Attendance Rate</span>
               <div className="text-2xl font-black text-emerald-600">
                 {studentHistory.attendancePercentage}%
               </div>
@@ -198,7 +207,7 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
 
           <Card className="p-4 border-l-4 border-l-blue-500 flex items-center justify-between">
             <div>
-              <span className="text-xs text-gray-400 font-semibold">Verified Present</span>
+              <span className="text-xs text-gray-400 font-semibold">Lectures Attended</span>
               <div className="text-2xl font-black text-blue-600">
                 {studentHistory.totalPresent} Sessions
               </div>
@@ -218,11 +227,13 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
         </div>
       )}
 
-      {/* Session History Table */}
+      {/* Session History & Live Attendance Table */}
       <Card className="p-5 space-y-4">
         <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-indigo-500" />
-          {isFacultyOrAdmin ? 'Attendance Sessions History' : 'My Attendance Records'}
+          {isFacultyOrAdmin
+            ? `Past Attendance Sessions for ${subject.code}`
+            : `My ${subject.name} Attendance History`}
         </h3>
 
         {loading ? (
@@ -231,8 +242,8 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
           sessions.length === 0 ? (
             <EmptyState
               icon={<QrCode className="w-8 h-8 text-gray-400" />}
-              title="No attendance sessions yet"
-              description="Start a 5-minute dynamic attendance session for this class above."
+              title="No attendance sessions recorded yet"
+              description={`Launch a 5-minute dynamic attendance session for ${subject.name} above.`}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -240,11 +251,11 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
                 <thead className="border-b border-gray-200 dark:border-slate-800 text-gray-500 font-semibold">
                   <tr>
                     <th className="py-2.5 px-3">Session Title</th>
-                    <th className="py-2.5 px-3">Start Time</th>
+                    <th className="py-2.5 px-3">Date &amp; Time</th>
                     <th className="py-2.5 px-3">Allowed Radius</th>
-                    <th className="py-2.5 px-3">Attended</th>
+                    <th className="py-2.5 px-3">Turnout</th>
                     <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3 text-right">Actions</th>
+                    <th className="py-2.5 px-3 text-right">Roster &amp; GPS Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -263,7 +274,7 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
                           {sess.allowedRadiusMeters}m
                         </td>
                         <td className="py-3 px-3 font-semibold text-emerald-600">
-                          {sess.attendanceCount} students
+                          {sess.attendanceCount} verified
                         </td>
                         <td className="py-3 px-3">
                           {isLive ? (
@@ -281,7 +292,7 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
                             onClick={() => setActiveQrSession(sess)}
                             className="text-[11px] h-7"
                           >
-                            View Roster
+                            View Student GPS Roster
                           </Button>
                         </td>
                       </tr>
@@ -297,14 +308,14 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
             <EmptyState
               icon={<CheckCircle2 className="w-8 h-8 text-gray-400" />}
               title="No records yet"
-              description="Your verified in-class check-ins will appear here."
+              description={`Your verified check-ins for ${subject.name} will appear here.`}
             />
           ) : (
             <div className="space-y-2">
               {studentHistory.records.map((rec) => (
                 <div
                   key={rec._id}
-                  className="p-3 rounded-xl border border-gray-200 dark:border-slate-800 flex items-center justify-between text-xs"
+                  className="p-3 rounded-xl border border-gray-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center font-bold">
@@ -314,16 +325,34 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
                       <div className="font-bold text-gray-900 dark:text-gray-100">
                         {typeof rec.sessionId === 'object'
                           ? (rec.sessionId as any)?.title
-                          : 'Class Attendance'}
+                          : 'Subject Lecture Attendance'}
                       </div>
-                      <div className="text-[10px] text-gray-400">
-                        {new Date(rec.scannedAt).toLocaleString()} • Proximity:{' '}
-                        {Math.round(rec.distanceFromCenter)}m away
+                      <div className="text-[10px] text-gray-400 flex items-center gap-2 flex-wrap">
+                        <span>{new Date(rec.scannedAt).toLocaleString()}</span>
+                        <span>•</span>
+                        <span>Distance: {Math.round(rec.distanceFromCenter)}m away</span>
+                        {rec.latitude && rec.longitude && (
+                          <span className="font-mono text-gray-500">
+                            ({rec.latitude.toFixed(4)}, {rec.longitude.toFixed(4)})
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {rec.latitude && rec.longitude && (
+                      <a
+                        href={`https://www.google.com/maps?q=${rec.latitude},${rec.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-1 rounded-lg font-semibold"
+                      >
+                        <MapPin className="w-3 h-3 text-blue-500" />
+                        <span>GPS Pin</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
                     <Badge variant="emerald">Verified Present (+5 pts)</Badge>
                   </div>
                 </div>
@@ -333,17 +362,17 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
         )}
       </Card>
 
-      {/* Modal: Start Dynamic Attendance Session (Faculty) */}
+      {/* Modal: Start Dynamic Attendance Session for Subject (Faculty) */}
       <Modal
         isOpen={isStartSessionOpen}
         onClose={() => setIsStartSessionOpen(false)}
-        title="🚀 Launch 5-Minute Dynamic QR Attendance"
-        description="Generate a secure time-sensitive QR code with real-time GPS geolocation verification."
+        title={`🚀 Launch Dynamic Attendance for ${subject.name}`}
+        description="Generates a 10-second rotating cryptographic QR code with real-time GPS geolocation verification."
         maxWidth="md"
       >
         <form onSubmit={handleCreateSession} className="space-y-4">
           <Input
-            label="Session Title"
+            label="Lecture Title / Topic"
             value={sessionTitle}
             onChange={(e) => setSessionTitle(e.target.value)}
             required
@@ -359,15 +388,15 @@ export const ClassAttendanceTab: React.FC<ClassAttendanceTabProps> = ({ classId,
                 onChange={(e) => setRadiusMeters(Number(e.target.value))}
                 className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-gray-800 dark:text-gray-200"
               >
-                <option value={50}>50 meters (Strict Classroom)</option>
-                <option value={100}>100 meters (Standard Lecture Hall)</option>
-                <option value={200}>200 meters (Auditorium / Campus)</option>
+                <option value={50}>50 meters (Classroom)</option>
+                <option value={100}>100 meters (Lecture Hall)</option>
+                <option value={200}>200 meters (Auditorium / Lab)</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                Duration (minutes)
+                Session Duration
               </label>
               <select
                 value={durationMinutes}

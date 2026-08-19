@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { AttendanceSession, IAttendanceSession } from '../models/AttendanceSession.js';
 import { AttendanceRecord, IAttendanceRecord } from '../models/AttendanceRecord.js';
 import { Class } from '../models/Class.js';
+import { Subject } from '../models/Subject.js';
 import { ClassMember } from '../models/ClassMember.js';
 import { PointsService } from './points.service.js';
 import { emitToClass, emitToUser } from '../config/socket.js';
@@ -43,6 +44,62 @@ export class AttendanceService {
       .update(`${sessionId}:${bucket}`)
       .digest('hex')
       .substring(0, 16);
+  }
+
+  /**
+   * Faculty initializes a 5-minute dynamic QR attendance session for an individual Subject
+   */
+  static async createSubjectSession(
+    facultyId: string,
+    userRole: UserRole,
+    subjectId: string,
+    data: {
+      title?: string;
+      centerLatitude: number;
+      centerLongitude: number;
+      allowedRadiusMeters?: number;
+      durationMinutes?: number;
+    }
+  ): Promise<IAttendanceSession> {
+    if (userRole !== 'FACULTY' && userRole !== 'ADMIN') {
+      throw new Error('Only faculty and administrators can create attendance sessions.');
+    }
+
+    const subject = await Subject.findById(subjectId);
+    if (!subject) throw new Error('Subject not found');
+
+    const classDoc = await Class.findById(subject.classId);
+    if (!classDoc) throw new Error('Associated Class not found');
+
+    const sessionSecret = crypto.randomBytes(32).toString('hex');
+    const durationMinutes = Math.min(60, Math.max(1, data.durationMinutes || 5));
+    const startTime = new Date();
+    const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
+
+    const session = await AttendanceSession.create({
+      classId: subject.classId,
+      subjectId: new Types.ObjectId(subjectId),
+      facultyId: new Types.ObjectId(facultyId),
+      title: data.title || `${subject.name} (${subject.code}) - Live Attendance`,
+      sessionSecret,
+      centerLatitude: data.centerLatitude,
+      centerLongitude: data.centerLongitude,
+      allowedRadiusMeters: data.allowedRadiusMeters || 100,
+      startTime,
+      endTime,
+      status: 'ACTIVE',
+      attendanceCount: 0,
+    });
+
+    emitToClass(subject.classId.toString(), 'attendance:session-started', {
+      sessionId: session._id,
+      subjectId: subject._id,
+      title: session.title,
+      endTime: session.endTime,
+      allowedRadiusMeters: session.allowedRadiusMeters,
+    });
+
+    return session;
   }
 
   /**
@@ -90,6 +147,7 @@ export class AttendanceService {
 
     emitToClass(classId, 'attendance:session-started', {
       sessionId: session._id,
+      subjectId: session.subjectId,
       title: session.title,
       endTime: session.endTime,
       allowedRadiusMeters: session.allowedRadiusMeters,
@@ -261,7 +319,8 @@ export class AttendanceService {
   static async getSessionDetails(sessionId: string): Promise<any> {
     const session = await AttendanceSession.findById(sessionId)
       .populate('facultyId', 'name email avatar')
-      .populate('classId', 'name code department');
+      .populate('classId', 'name code department')
+      .populate('subjectId', 'name code');
 
     if (!session) throw new Error('Attendance session not found');
 
@@ -284,11 +343,25 @@ export class AttendanceService {
   }
 
   /**
+   * Get subject attendance history and session reports for faculty & admin
+   */
+  static async getSubjectAttendanceHistory(subjectId: string): Promise<any[]> {
+    const sessions = await AttendanceSession.find({ subjectId: new Types.ObjectId(subjectId) })
+      .populate('facultyId', 'name email avatar')
+      .populate('subjectId', 'name code')
+      .sort({ startTime: -1 })
+      .limit(50);
+
+    return sessions;
+  }
+
+  /**
    * Get class attendance history and session reports for faculty & admin
    */
   static async getClassAttendanceHistory(classId: string): Promise<any[]> {
     const sessions = await AttendanceSession.find({ classId })
       .populate('facultyId', 'name email')
+      .populate('subjectId', 'name code')
       .sort({ startTime: -1 })
       .limit(50);
 
@@ -300,20 +373,25 @@ export class AttendanceService {
    */
   static async getStudentAttendanceHistory(
     studentId: string,
-    classId?: string
+    classId?: string,
+    subjectId?: string
   ): Promise<{ records: any[]; totalPresent: number; attendancePercentage: number }> {
     const query: any = { studentId: new Types.ObjectId(studentId) };
-    if (classId) query.classId = new Types.ObjectId(classId);
+    if (subjectId) query.subjectId = new Types.ObjectId(subjectId);
+    else if (classId) query.classId = new Types.ObjectId(classId);
 
     const records = await AttendanceRecord.find(query)
       .populate('sessionId', 'title startTime endTime')
       .populate('classId', 'name code')
+      .populate('subjectId', 'name code')
       .sort({ scannedAt: -1 });
 
     const totalPresent = records.filter((r) => r.verificationStatus === 'PRESENT').length;
 
     let totalSessions = records.length;
-    if (classId) {
+    if (subjectId) {
+      totalSessions = await AttendanceSession.countDocuments({ subjectId });
+    } else if (classId) {
       totalSessions = await AttendanceSession.countDocuments({ classId });
     }
 
