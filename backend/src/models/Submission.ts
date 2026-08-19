@@ -18,6 +18,30 @@ export interface ISubmission extends Document {
   gradedBy?: Types.ObjectId;
   gradedAt?: Date;
   pointsAwarded: number;
+  plagiarismScore?: number;
+  matchedSubmissionId?: Types.ObjectId;
+  matchedStudentName?: string;
+  isDuplicateFlag?: boolean;
+  similarityDetails?: {
+    matchedExcerpts?: string[];
+    commonKeywords?: string[];
+    confidence?: number;
+    comparisonSummary?: string;
+  };
+  aiEvaluation?: {
+    suggestedMarks?: number;
+    maxMarks?: number;
+    rubricBreakdown?: {
+      criterion: string;
+      score: number;
+      maxScore: number;
+      comments: string;
+    }[];
+    strengths?: string[];
+    areasForImprovement?: string[];
+    suggestedFeedback?: string;
+    evaluatedAt?: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +68,32 @@ const SubmissionSchema = new Schema<ISubmission>(
     gradedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     gradedAt: { type: Date },
     pointsAwarded: { type: Number, default: 0 },
+    plagiarismScore: { type: Number, default: 0, min: 0, max: 100 },
+    matchedSubmissionId: { type: Schema.Types.ObjectId, ref: 'Submission' },
+    matchedStudentName: { type: String, default: '' },
+    isDuplicateFlag: { type: Boolean, default: false, index: true },
+    similarityDetails: {
+      matchedExcerpts: [{ type: String }],
+      commonKeywords: [{ type: String }],
+      confidence: { type: Number, default: 0 },
+      comparisonSummary: { type: String, default: '' },
+    },
+    aiEvaluation: {
+      suggestedMarks: { type: Number },
+      maxMarks: { type: Number },
+      rubricBreakdown: [
+        {
+          criterion: { type: String },
+          score: { type: Number },
+          maxScore: { type: Number },
+          comments: { type: String },
+        },
+      ],
+      strengths: [{ type: String }],
+      areasForImprovement: [{ type: String }],
+      suggestedFeedback: { type: String },
+      evaluatedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );

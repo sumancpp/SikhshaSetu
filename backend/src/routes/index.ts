@@ -16,12 +16,16 @@ import searchRoutes from './search.routes.js';
 import aiRoutes from './ai.routes.js';
 import codeExecutionRoutes from './codeExecution.routes.js';
 import arenaRoutes from './arena.routes.js';
+import classCommentRoutes from './classComment.routes.js';
+import attendanceRoutes from './attendance.routes.js';
 
 const apiRouter = Router();
 
 apiRouter.use('/auth', authRoutes);
 apiRouter.use('/users', userRoutes);
 apiRouter.use('/classes', classRoutes);
+apiRouter.use('/classes', classCommentRoutes);
+apiRouter.use('/attendance', attendanceRoutes);
 apiRouter.use('/subjects', subjectRoutes);
 apiRouter.use('/materials', materialRoutes);
 apiRouter.use('/assignments', assignmentRoutes);

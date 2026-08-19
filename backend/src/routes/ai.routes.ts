@@ -16,6 +16,10 @@ router.post('/generate-quiz', requireRole('ADMIN', 'FACULTY'), AiController.gene
 // AI Rubric & Assignment Feedback Assistant (Faculty & Admin)
 router.post('/grade-submission', requireRole('ADMIN', 'FACULTY'), AiController.gradeSubmission);
 
+// Plagiarism & Duplicate Submission Detector (Faculty & Admin)
+router.post('/plagiarism-check', requireRole('ADMIN', 'FACULTY'), AiController.checkPlagiarism);
+router.get('/plagiarism-report/:assignmentId', requireRole('ADMIN', 'FACULTY'), AiController.getPlagiarismReport);
+
 // Subject Flashcards
 router.get('/flashcards/:subjectId', AiController.getFlashcards);
 

@@ -48,4 +48,14 @@ export const aiApi = {
     const res = await apiClient.get(`/ai/flashcards/${subjectId}${qs ? `?${qs}` : ''}`);
     return res.data;
   },
+
+  checkPlagiarism: async (assignmentId: string): Promise<{ success: boolean; message: string; data: any }> => {
+    const res = await apiClient.post('/ai/plagiarism-check', { assignmentId });
+    return res.data;
+  },
+
+  getPlagiarismReport: async (assignmentId: string): Promise<{ success: boolean; data: any }> => {
+    const res = await apiClient.get(`/ai/plagiarism-report/${assignmentId}`);
+    return res.data;
+  },
 };

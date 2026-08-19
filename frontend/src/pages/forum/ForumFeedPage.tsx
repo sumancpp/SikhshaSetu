@@ -30,6 +30,7 @@ export const ForumFeedPage: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  const [audienceFilter, setAudienceFilter] = useState<'ALL' | 'DEPARTMENT_ONLY' | 'FACULTY_AND_PARENTS'>('ALL');
   const [search, setSearch] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [trendingTags, setTrendingTags] = useState<any[]>([]);
@@ -41,11 +42,15 @@ export const ForumFeedPage: React.FC = () => {
     description: '',
     tags: '',
     subjectId: '',
+    audience: 'ALL' as 'ALL' | 'DEPARTMENT_ONLY' | 'FACULTY_AND_PARENTS',
+    targetDepartment: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { user } = useAuth();
   const { success, error } = useToast();
+
+  const isStudent = user?.role === 'STUDENT';
 
   const fetchPosts = async () => {
     try {
@@ -54,6 +59,8 @@ export const ForumFeedPage: React.FC = () => {
         filter: filter !== 'ALL' ? filter : undefined,
         search: search || undefined,
         tag: selectedTag || undefined,
+        audience: audienceFilter !== 'ALL' ? audienceFilter : undefined,
+        department: audienceFilter === 'DEPARTMENT_ONLY' ? user?.department : undefined,
       });
       if (res.success) {
         setPosts(res.data.posts);
@@ -67,7 +74,7 @@ export const ForumFeedPage: React.FC = () => {
 
   useEffect(() => {
     fetchPosts();
-  }, [filter, selectedTag]);
+  }, [filter, audienceFilter, selectedTag]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -138,6 +145,51 @@ export const ForumFeedPage: React.FC = () => {
         </Button>
       </div>
 
+      {/* Audience Board Switcher */}
+      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-gray-100 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 overflow-x-auto">
+        <button
+          onClick={() => setAudienceFilter('ALL')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+            audienceFilter === 'ALL'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          🌐 All Campus Q&amp;A
+        </button>
+
+        <button
+          onClick={() => setAudienceFilter('DEPARTMENT_ONLY')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+            audienceFilter === 'DEPARTMENT_ONLY'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          🏛️ My Department ({user?.department || 'General'})
+        </button>
+
+        {!isStudent ? (
+          <button
+            onClick={() => setAudienceFilter('FACULTY_AND_PARENTS')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              audienceFilter === 'FACULTY_AND_PARENTS'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40'
+            }`}
+          >
+            👨‍🏫 Faculty &amp; Parents Community Board
+          </button>
+        ) : (
+          <div
+            title="Restricted: Visible only to Faculty, Administrators, and Parents."
+            className="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 dark:text-slate-600 flex items-center gap-1.5 cursor-not-allowed shrink-0"
+          >
+            <span>🔒 Faculty &amp; Parents Board (Staff Only)</span>
+          </div>
+        )}
+      </div>
+
       {/* Filter Tabs & Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
@@ -179,7 +231,7 @@ export const ForumFeedPage: React.FC = () => {
             <EmptyState
               icon={<MessageSquare className="w-6 h-6" />}
               title="No questions found"
-              description="Be the first to post a query in the forum."
+              description="Be the first to post a query in this discussion board."
               actionText="Ask a Question"
               onAction={() => setIsNewPostOpen(true)}
             />
@@ -220,6 +272,19 @@ export const ForumFeedPage: React.FC = () => {
                     >
                       {post.title}
                     </Link>
+
+                    {post.audience === 'FACULTY_AND_PARENTS' && (
+                      <Badge variant="purple" className="text-[10px]">
+                        🔒 Faculty &amp; Parents
+                      </Badge>
+                    )}
+
+                    {post.audience === 'DEPARTMENT_ONLY' && (
+                      <Badge variant="blue" className="text-[10px]">
+                        🏛️ {post.targetDepartment || 'Dept'} Only
+                      </Badge>
+                    )}
+
                     {post.hasAcceptedAnswer && (
                       <Badge variant="emerald" className="flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
@@ -250,20 +315,27 @@ export const ForumFeedPage: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Footer Meta */}
                   <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-100 dark:border-slate-800">
                     <div className="flex items-center gap-2">
-                      <Avatar src={post.authorId?.avatar} name={post.authorId?.name} size="sm" />
-                      <span>{post.authorId?.name}</span>
-                      <span className="text-[11px]">&bull; {formatDate(post.createdAt)}</span>
+                      <Avatar
+                        src={post.authorId?.avatar}
+                        name={post.authorId?.name || 'User'}
+                        size="sm"
+                      />
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {post.authorId?.name}
+                      </span>
+                      <span>•</span>
+                      <span>{formatDate(post.createdAt)}</span>
                     </div>
 
-                    <Link
-                      to={`/forum/${post._id}`}
-                      className="flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      {post.answersCount} Answers
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        {post.answersCount} {post.answersCount === 1 ? 'answer' : 'answers'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -271,28 +343,34 @@ export const ForumFeedPage: React.FC = () => {
           )}
         </div>
 
-        {/* Right Sidebar: Trending Topics */}
+        {/* Sidebar: Trending Tags */}
         <div className="space-y-4">
-          <Card className="space-y-3">
-            <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-blue-500" />
-              Trending Tags
-            </h4>
-            <div className="flex flex-wrap gap-1.5">
-              {['algorithms', 'concurrency', 'data-structures', 'graph-theory', 'operating-systems', 'deadlocks', 'sql'].map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => setSelectedTag(selectedTag === tag ? '' : tag)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    selectedTag === tag
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
+          <Card className="p-4 space-y-3">
+            <h3 className="text-xs font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5 uppercase tracking-wider">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              Trending Topics
+            </h3>
+
+            {trendingTags.length === 0 ? (
+              <p className="text-xs text-gray-400">No popular tags yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {trendingTags.map((t, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedTag(selectedTag === t._id ? '' : t._id)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all ${
+                      selectedTag === t._id
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>#{t._id}</span>
+                    <span className="text-[10px] opacity-60">({t.count})</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>
@@ -301,7 +379,7 @@ export const ForumFeedPage: React.FC = () => {
       <Modal
         isOpen={isNewPostOpen}
         onClose={() => setIsNewPostOpen(false)}
-        title="Ask Academic Question"
+        title="Ask Academic Question / Discussion"
         description="Share your doubt with the community and earn points when participating."
       >
         <form
@@ -317,12 +395,24 @@ export const ForumFeedPage: React.FC = () => {
                 title: postForm.title.trim(),
                 description: postForm.description.trim(),
                 subjectId: postForm.subjectId || undefined,
+                audience: postForm.audience,
+                targetDepartment:
+                  postForm.audience === 'DEPARTMENT_ONLY'
+                    ? postForm.targetDepartment || user?.department
+                    : undefined,
                 tags: postForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
               });
               if (res.success) {
                 success('Question Posted!', 'Your question is now live in the forum (+5 pts earned)');
                 setIsNewPostOpen(false);
-                setPostForm({ title: '', description: '', tags: '', subjectId: '' });
+                setPostForm({
+                  title: '',
+                  description: '',
+                  tags: '',
+                  subjectId: '',
+                  audience: 'ALL',
+                  targetDepartment: '',
+                });
                 fetchPosts();
               }
             } catch (err: any) {
@@ -341,22 +431,50 @@ export const ForumFeedPage: React.FC = () => {
             required
           />
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-              Subject Category (Optional)
-            </label>
-            <select
-              className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
-              value={postForm.subjectId}
-              onChange={(e) => setPostForm({ ...postForm, subjectId: e.target.value })}
-            >
-              <option value="">General Academic Community</option>
-              {subjects.map((sub) => (
-                <option key={sub._id} value={sub._id}>
-                  {sub.name} ({sub.code})
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                Target Board &amp; Audience
+              </label>
+              <select
+                className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
+                value={postForm.audience}
+                onChange={(e) =>
+                  setPostForm({
+                    ...postForm,
+                    audience: e.target.value as any,
+                  })
+                }
+              >
+                <option value="ALL">🌐 All Campus Public</option>
+                <option value="DEPARTMENT_ONLY">
+                  🏛️ Department Only ({user?.department || 'My Department'})
                 </option>
-              ))}
-            </select>
+                {!isStudent && (
+                  <option value="FACULTY_AND_PARENTS">
+                    👨‍🏫 Faculty &amp; Parents Exclusive Board
+                  </option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                Subject Category (Optional)
+              </label>
+              <select
+                className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
+                value={postForm.subjectId}
+                onChange={(e) => setPostForm({ ...postForm, subjectId: e.target.value })}
+              >
+                <option value="">General Academic Community</option>
+                {subjects.map((sub) => (
+                  <option key={sub._id} value={sub._id}>
+                    {sub.name} ({sub.code})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>

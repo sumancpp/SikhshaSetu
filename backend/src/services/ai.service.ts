@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { Types } from 'mongoose';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import pdfParse from 'pdf-parse';
 import { env } from '../config/env.js';
@@ -1127,5 +1128,294 @@ INSTRUCTIONS:
 
     return quizResult.flashcards || [];
   }
+
+  /**
+   * Helper to extract readable text from submission text and attached PDF/documents
+   */
+  private static async extractSubmissionContent(sub: any): Promise<string> {
+    let content = (sub.submissionText || '').trim();
+
+    if (sub.fileUrl && (sub.fileUrl.endsWith('.pdf') || (sub.fileName && sub.fileName.endsWith('.pdf')))) {
+      try {
+        const candidatePaths = [
+          path.resolve(process.cwd(), sub.fileUrl.replace(/^\//, '')),
+          path.resolve(process.cwd(), env.UPLOAD_DIR || 'uploads', path.basename(sub.fileUrl)),
+          path.resolve(process.cwd(), 'uploads', sub.fileName),
+        ];
+
+        for (const p of candidatePaths) {
+          if (fs.existsSync(p)) {
+            const dataBuffer = fs.readFileSync(p);
+            const pdfData = await pdfParse(dataBuffer);
+            if (pdfData && pdfData.text) {
+              content += '\n' + pdfData.text.trim();
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[AiService] Error parsing PDF for submission ${sub._id}:`, err);
+      }
+    }
+
+    if (!content) {
+      content = `Submission by ${(sub.studentId as any)?.name || 'Student'}: File ${sub.fileName} (${sub.fileSize || 0} bytes).`;
+    }
+
+    return content;
+  }
+
+  /**
+   * Calculate lexical and n-gram similarity between two submission texts
+   */
+  private static calculateSimilarityMetrics(text1: string, text2: string): {
+    score: number;
+    commonKeywords: string[];
+    matchingExcerpts: string[];
+  } {
+    const clean1 = text1.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+    const clean2 = text2.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+
+    const words1 = clean1.split(/\s+/).filter((w) => w.length > 3);
+    const words2 = clean2.split(/\s+/).filter((w) => w.length > 3);
+
+    if (words1.length === 0 || words2.length === 0) {
+      return { score: 0, commonKeywords: [], matchingExcerpts: [] };
+    }
+
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+
+    // Common words
+    const commonWords: string[] = [];
+    set1.forEach((w) => {
+      if (set2.has(w)) commonWords.push(w);
+    });
+
+    const jaccard = commonWords.length / Math.max(1, new Set([...words1, ...words2]).size);
+
+    // 3-gram Shingling
+    const ngrams1 = new Set<string>();
+    for (let i = 0; i <= words1.length - 3; i++) {
+      ngrams1.add(`${words1[i]} ${words1[i + 1]} ${words1[i + 2]}`);
+    }
+
+    const ngrams2 = new Set<string>();
+    for (let i = 0; i <= words2.length - 3; i++) {
+      ngrams2.add(`${words2[i]} ${words2[i + 1]} ${words2[i + 2]}`);
+    }
+
+    let sharedNgrams = 0;
+    const matchingExcerpts: string[] = [];
+    ngrams1.forEach((ng) => {
+      if (ngrams2.has(ng)) {
+        sharedNgrams++;
+        if (matchingExcerpts.length < 5) matchingExcerpts.push(ng);
+      }
+    });
+
+    const ngramSimilarity =
+      ngrams1.size > 0 && ngrams2.size > 0
+        ? (2 * sharedNgrams) / (ngrams1.size + ngrams2.size)
+        : 0;
+
+    // Combined Weighted Score (0 to 100)
+    const combinedScore = Math.round((jaccard * 0.4 + ngramSimilarity * 0.6) * 100);
+
+    return {
+      score: Math.min(100, combinedScore),
+      commonKeywords: commonWords.slice(0, 10),
+      matchingExcerpts,
+    };
+  }
+
+  /**
+   * Run AI Plagiarism and Duplicate Detection across all student submissions for an assignment
+   */
+  static async detectPlagiarismAndDuplicates(assignmentId: string): Promise<any> {
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) throw new Error('Assignment not found');
+
+    const submissions = await Submission.find({ assignmentId })
+      .populate('studentId', 'name email studentId avatar')
+      .sort({ submittedAt: 1 });
+
+    if (submissions.length === 0) {
+      return {
+        assignmentId,
+        totalSubmissions: 0,
+        duplicatesDetectedCount: 0,
+        flaggedPairs: [],
+        message: 'No submissions found to analyze.',
+      };
+    }
+
+    // 1. Extract content from all submissions
+    const contents: { subId: string; studentName: string; studentIdStr: string; text: string }[] = [];
+    for (const sub of submissions) {
+      const text = await this.extractSubmissionContent(sub);
+      const student = sub.studentId as any;
+      contents.push({
+        subId: sub._id.toString(),
+        studentName: student?.name || 'Student',
+        studentIdStr: student?._id?.toString() || '',
+        text,
+      });
+    }
+
+    const flaggedPairs: any[] = [];
+    const maxSimilarityMap: { [subId: string]: { score: number; matchedSubId: string; matchedName: string; details: any } } = {};
+
+    // 2. Pairwise Similarity Comparison
+    for (let i = 0; i < contents.length; i++) {
+      for (let j = i + 1; j < contents.length; j++) {
+        const itemA = contents[i];
+        const itemB = contents[j];
+
+        const sim = this.calculateSimilarityMetrics(itemA.text, itemB.text);
+
+        if (sim.score >= 50) {
+          let aiAnalysis: any = null;
+
+          // If highly suspicious (>= 65%), verify with LLM for forensic report
+          if (sim.score >= 65) {
+            const prompt = `
+You are an Academic Integrity AI Inspector evaluating two student assignment submissions for similarity, duplicate copying, or plagiarism.
+
+ASSIGNMENT TITLE: "${assignment.title}"
+STUDENT A: "${itemA.studentName}"
+STUDENT B: "${itemB.studentName}"
+
+STUDENT A SUBMISSION EXCERPT:
+"""
+${itemA.text.substring(0, 1500)}
+"""
+
+STUDENT B SUBMISSION EXCERPT:
+"""
+${itemB.text.substring(0, 1500)}
+"""
+
+INSTRUCTIONS:
+1. Objectively determine if Student A and Student B submitted identical, copied, or heavily duplicate answers (e.g. shared code, identical structure, copy-pasted explanations).
+2. Estimate the true plagiarism/similarity percentage (0 - 100).
+3. Identify 2-3 matched excerpts or identical sentences/functions.
+4. Output strictly valid JSON matching this schema:
+{
+  "plagiarismScore": number,
+  "isDuplicate": boolean,
+  "confidence": number,
+  "comparisonSummary": "Clear 2-sentence forensic evaluation summarizing matching sections and copied parts.",
+  "matchedExcerpts": ["matched sentence or code 1", "matched sentence or code 2"]
 }
+`;
+            aiAnalysis = await this.executeMultiModelPrompt(prompt, ['gemini-2.0-flash', 'gemini-1.5-flash']);
+          }
+
+          const finalScore = aiAnalysis?.plagiarismScore !== undefined ? aiAnalysis.plagiarismScore : sim.score;
+          const isDuplicate = finalScore >= 70 || Boolean(aiAnalysis?.isDuplicate);
+          const summary =
+            aiAnalysis?.comparisonSummary ||
+            `Submissions share ${finalScore}% matching vocabulary and identical n-gram phrasing with common patterns.`;
+          const matchedExcerpts = aiAnalysis?.matchedExcerpts || sim.matchingExcerpts;
+
+          const pair = {
+            studentA: { id: itemA.studentIdStr, name: itemA.studentName, submissionId: itemA.subId },
+            studentB: { id: itemB.studentIdStr, name: itemB.studentName, submissionId: itemB.subId },
+            similarityScore: finalScore,
+            isDuplicate,
+            comparisonSummary: summary,
+            commonKeywords: sim.commonKeywords,
+            matchedExcerpts,
+          };
+
+          flaggedPairs.push(pair);
+
+          // Update max map for A
+          if (!maxSimilarityMap[itemA.subId] || maxSimilarityMap[itemA.subId].score < finalScore) {
+            maxSimilarityMap[itemA.subId] = {
+              score: finalScore,
+              matchedSubId: itemB.subId,
+              matchedName: itemB.studentName,
+              details: {
+                matchedExcerpts,
+                commonKeywords: sim.commonKeywords,
+                confidence: aiAnalysis?.confidence || 0.85,
+                comparisonSummary: summary,
+              },
+            };
+          }
+
+          // Update max map for B
+          if (!maxSimilarityMap[itemB.subId] || maxSimilarityMap[itemB.subId].score < finalScore) {
+            maxSimilarityMap[itemB.subId] = {
+              score: finalScore,
+              matchedSubId: itemA.subId,
+              matchedName: itemA.studentName,
+              details: {
+                matchedExcerpts,
+                commonKeywords: sim.commonKeywords,
+                confidence: aiAnalysis?.confidence || 0.85,
+                comparisonSummary: summary,
+              },
+            };
+          }
+        }
+      }
+    }
+
+    // 3. Persist Plagiarism Findings into MongoDB Submissions
+    for (const sub of submissions) {
+      const match = maxSimilarityMap[sub._id.toString()];
+      if (match) {
+        sub.plagiarismScore = match.score;
+        sub.matchedSubmissionId = new Types.ObjectId(match.matchedSubId);
+        sub.matchedStudentName = match.matchedName;
+        sub.isDuplicateFlag = match.score >= 70;
+        sub.similarityDetails = match.details;
+      } else {
+        sub.plagiarismScore = 0;
+        sub.isDuplicateFlag = false;
+      }
+      await sub.save();
+    }
+
+    // Sort flagged pairs by highest similarity first
+    flaggedPairs.sort((a, b) => b.similarityScore - a.similarityScore);
+
+    return {
+      assignmentId,
+      assignmentTitle: assignment.title,
+      totalSubmissions: submissions.length,
+      duplicatesDetectedCount: flaggedPairs.filter((p) => p.isDuplicate).length,
+      flaggedPairsCount: flaggedPairs.length,
+      flaggedPairs,
+      analyzedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Get existing Plagiarism Report for an assignment
+   */
+  static async getPlagiarismReport(assignmentId: string): Promise<any> {
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) throw new Error('Assignment not found');
+
+    const submissions = await Submission.find({
+      assignmentId,
+      plagiarismScore: { $gt: 0 },
+    })
+      .populate('studentId', 'name email studentId avatar')
+      .populate('matchedSubmissionId')
+      .sort({ plagiarismScore: -1 });
+
+    return {
+      assignmentId,
+      assignmentTitle: assignment.title,
+      flaggedSubmissions: submissions,
+      duplicatesCount: submissions.filter((s) => s.isDuplicateFlag).length,
+    };
+  }
+}
+
 

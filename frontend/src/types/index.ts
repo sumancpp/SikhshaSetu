@@ -1,4 +1,11 @@
-export type UserRole = 'ADMIN' | 'FACULTY' | 'STUDENT';
+export type UserRole = 'ADMIN' | 'FACULTY' | 'STUDENT' | 'PARENT';
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data: T;
+  message?: string;
+  count?: number;
+}
 
 export interface User {
   _id: string;
@@ -130,6 +137,30 @@ export interface Submission {
   gradedBy?: User;
   gradedAt?: string;
   pointsAwarded: number;
+  plagiarismScore?: number;
+  matchedSubmissionId?: string;
+  matchedStudentName?: string;
+  isDuplicateFlag?: boolean;
+  similarityDetails?: {
+    matchedExcerpts?: string[];
+    commonKeywords?: string[];
+    confidence?: number;
+    comparisonSummary?: string;
+  };
+  aiEvaluation?: {
+    suggestedMarks?: number;
+    maxMarks?: number;
+    rubricBreakdown?: {
+      criterion: string;
+      score: number;
+      maxScore: number;
+      comments: string;
+    }[];
+    strengths?: string[];
+    areasForImprovement?: string[];
+    suggestedFeedback?: string;
+    evaluatedAt?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -234,6 +265,8 @@ export interface Achievement {
   category: 'CHALLENGE' | 'QUIZ' | 'FORUM' | 'STREAK' | 'GENERAL';
 }
 
+export type ForumAudience = 'ALL' | 'DEPARTMENT_ONLY' | 'FACULTY_AND_PARENTS' | 'FACULTY_ONLY';
+
 export interface ForumPost {
   _id: string;
   classId: Class | string;
@@ -244,6 +277,9 @@ export interface ForumPost {
   attachments: string[];
   authorId: User;
   authorRole: UserRole;
+  audience?: ForumAudience;
+  targetDepartment?: string;
+  allowedRoles?: string[];
   upvotesCount: number;
   downvotesCount: number;
   answersCount: number;
@@ -522,4 +558,102 @@ export interface ArenaRoundResult {
   winner?: 'PLAYER' | 'OPPONENT' | 'TIE';
   xpAwarded?: number;
 }
+
+// ==========================================
+// 💬 Granular Class Comment Types
+// ==========================================
+
+export type CommentVisibility = 'ALL' | 'TEACHER_ONLY' | 'SELECTED';
+
+export interface ClassComment {
+  _id: string;
+  classId: string;
+  authorId: User;
+  authorRole: UserRole;
+  content: string;
+  visibility: CommentVisibility;
+  targetUserIds: User[];
+  attachments: {
+    fileName: string;
+    fileUrl: string;
+    fileSize: number;
+  }[];
+  isResolved?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==========================================
+// 📍 Anti-Cheat Dynamic QR Attendance Types
+// ==========================================
+
+export type AttendanceSessionStatus = 'ACTIVE' | 'EXPIRED' | 'CLOSED';
+export type AttendanceVerificationStatus =
+  | 'PRESENT'
+  | 'OUT_OF_RANGE'
+  | 'SUSPICIOUS_TOKEN_EXPIRED'
+  | 'REJECTED';
+
+export interface AttendanceSession {
+  _id: string;
+  classId: string;
+  subjectId?: string;
+  facultyId: User;
+  title: string;
+  centerLatitude: number;
+  centerLongitude: number;
+  allowedRadiusMeters: number;
+  startTime: string;
+  endTime: string;
+  status: AttendanceSessionStatus;
+  attendanceCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttendanceRecord {
+  _id: string;
+  sessionId: string | AttendanceSession;
+  classId: string | Class;
+  subjectId?: string;
+  studentId: User;
+  scannedAt: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  distanceFromCenter: number;
+  verificationStatus: AttendanceVerificationStatus;
+  pointsAwarded: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LiveTokenResponse {
+  token: string;
+  sessionId: string;
+  timeRemainingSeconds: number;
+  rotationIntervalMs: number;
+  active: boolean;
+}
+
+export interface PlagiarismPair {
+  studentA: { id: string; name: string; submissionId: string };
+  studentB: { id: string; name: string; submissionId: string };
+  similarityScore: number;
+  isDuplicate: boolean;
+  comparisonSummary: string;
+  commonKeywords: string[];
+  matchedExcerpts: string[];
+}
+
+export interface PlagiarismReport {
+  assignmentId: string;
+  assignmentTitle: string;
+  totalSubmissions: number;
+  duplicatesDetectedCount: number;
+  flaggedPairsCount: number;
+  flaggedPairs: PlagiarismPair[];
+  analyzedAt: string;
+}
+
 

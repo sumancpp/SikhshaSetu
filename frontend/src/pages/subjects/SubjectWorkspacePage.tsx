@@ -57,6 +57,7 @@ import {
   XCircle,
   Percent,
   AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const SubjectWorkspacePage: React.FC = () => {
@@ -173,6 +174,8 @@ export const SubjectWorkspacePage: React.FC = () => {
   const [aiSubMode, setAiSubMode] = useState<'doubt' | 'flashcards'>('doubt');
   const [loadingAiRubric, setLoadingAiRubric] = useState<Record<string, boolean>>({});
   const [aiRubricData, setAiRubricData] = useState<Record<string, AiRubricEvaluation>>({});
+  const [runningPlagiarismScan, setRunningPlagiarismScan] = useState(false);
+  const [plagiarismReport, setPlagiarismReport] = useState<any | null>(null);
 
   const { user } = useAuth();
   const { success, error, info } = useToast();
@@ -404,6 +407,25 @@ export const SubjectWorkspacePage: React.FC = () => {
       error('AI Evaluation Failed', err.response?.data?.message || 'Could not evaluate submission with AI.');
     } finally {
       setLoadingAiRubric((prev) => ({ ...prev, [submissionId]: false }));
+    }
+  };
+
+  const handleRunPlagiarismScan = async (assignmentId: string) => {
+    setRunningPlagiarismScan(true);
+    try {
+      const res = await aiApi.checkPlagiarism(assignmentId);
+      if (res.success) {
+        setPlagiarismReport(res.data);
+        const subRes = await assignmentApi.getSubmissions(assignmentId);
+        if (subRes.success) {
+          setSubmissionsList(subRes.data);
+        }
+        success('Plagiarism Scan Finished! 🛡️', res.message || 'Scanned all student submissions.');
+      }
+    } catch (err: any) {
+      error('Plagiarism Scan Failed', err.response?.data?.message || 'Could not scan submissions.');
+    } finally {
+      setRunningPlagiarismScan(false);
     }
   };
 
@@ -1669,108 +1691,188 @@ export const SubjectWorkspacePage: React.FC = () => {
         isOpen={!!gradingAssignment}
         onClose={() => setGradingAssignment(null)}
         title={`Grading: ${gradingAssignment?.title}`}
-        description="Review student submissions, provide qualitative feedback, and allocate marks."
+        description="Review student submissions, provide qualitative feedback, and detect duplicates."
         maxWidth="2xl"
       >
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          {/* Plagiarism & Duplicate Detector Action Bar */}
+          <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                <span>AI Plagiarism &amp; Duplicate Submission Guard</span>
+              </div>
+              <p className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                Cross-compares all student submissions to detect copy-pasting, identical scripts, and high token overlap.
+              </p>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => gradingAssignment && handleRunPlagiarismScan(gradingAssignment._id)}
+              disabled={runningPlagiarismScan}
+              leftIcon={<Sparkles className={`w-3.5 h-3.5 text-indigo-600 ${runningPlagiarismScan ? 'animate-spin' : ''}`} />}
+              className="text-xs shrink-0 bg-white dark:bg-slate-900 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 font-bold"
+            >
+              {runningPlagiarismScan ? 'Analyzing All Submissions...' : '🛡️ Run Plagiarism Scan'}
+            </Button>
+          </div>
+
+          {/* Plagiarism Duplicate Summary Banner */}
+          {plagiarismReport && (
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between">
+              <span>
+                Scan Complete: <strong>{plagiarismReport.duplicatesDetectedCount}</strong> duplicate/high-similarity submissions flagged out of {plagiarismReport.totalSubmissions}.
+              </span>
+              <span className="text-[10px] text-amber-600 font-mono">
+                {new Date(plagiarismReport.analyzedAt).toLocaleTimeString()}
+              </span>
+            </div>
+          )}
+
           {loadingSubmissions ? (
             <div className="p-8 text-center text-xs text-gray-400">Loading student submissions...</div>
           ) : submissionsList.length === 0 ? (
             <div className="p-8 text-center text-xs text-gray-400">No students have submitted this assignment yet.</div>
           ) : (
-            submissionsList.map((sub) => (
-              <Card key={sub._id} className="space-y-3 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar src={sub.studentId?.avatar} name={sub.studentId?.name} size="sm" />
-                    <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-gray-100">{sub.studentId?.name}</p>
-                      <p className="text-[10px] text-gray-400">Submitted on {formatDateTime(sub.submittedAt)}</p>
+            submissionsList.map((sub) => {
+              const isPlagiarized = sub.isDuplicateFlag || (sub.plagiarismScore && sub.plagiarismScore >= 70);
+              const hasModerateSimilarity = sub.plagiarismScore && sub.plagiarismScore >= 45 && !isPlagiarized;
+
+              return (
+                <Card
+                  key={sub._id}
+                  className={`space-y-3 p-4 transition-all ${
+                    isPlagiarized
+                      ? 'border-2 border-red-500 bg-red-50/20 dark:bg-red-950/10'
+                      : hasModerateSimilarity
+                      ? 'border-2 border-amber-400 bg-amber-50/20 dark:bg-amber-950/10'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar src={sub.studentId?.avatar} name={sub.studentId?.name} size="sm" />
+                      <div>
+                        <p className="text-xs font-bold text-gray-900 dark:text-gray-100">{sub.studentId?.name}</p>
+                        <p className="text-[10px] text-gray-400">Submitted on {formatDateTime(sub.submittedAt)}</p>
+                      </div>
                     </div>
+
+                    <a
+                      href={sub.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 text-xs font-semibold"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download Work
+                    </a>
                   </div>
 
-                  <a
-                    href={sub.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 text-xs font-semibold"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Download Work
-                  </a>
-                </div>
+                  {/* Duplicate / Plagiarism Warning Box */}
+                  {isPlagiarized && (
+                    <div className="p-3 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-extrabold">
+                          <AlertTriangle className="w-4 h-4 text-red-600 animate-pulse" />
+                          🚨 DUPLICATE SUBMISSION DETECTED ({sub.plagiarismScore}% match)
+                        </span>
+                        <Badge variant="red" className="text-[10px] font-bold">
+                          Matched with: {sub.matchedStudentName || 'Another Student'}
+                        </Badge>
+                      </div>
+                      {sub.similarityDetails?.comparisonSummary && (
+                        <p className="text-[11px] text-red-700 dark:text-red-300 leading-relaxed">
+                          {sub.similarityDetails.comparisonSummary}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-slate-800">
-                  <Input
-                    label={`Marks (out of ${gradingAssignment?.maxMarks || 100})`}
-                    type="number"
-                    defaultValue={sub.marksObtained ?? ''}
-                    onChange={(e) =>
-                      setGradingMarks({ ...gradingMarks, [sub._id]: parseInt(e.target.value) || 0 })
-                    }
-                  />
-
-                  <Input
-                    label="Instructor Feedback"
-                    placeholder="e.g. Excellent logic and comments."
-                    defaultValue={sub.feedback || ''}
-                    onChange={(e) =>
-                      setGradingFeedback({ ...gradingFeedback, [sub._id]: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-slate-800">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => gradingAssignment && handleAiRubricGrade(gradingAssignment._id, sub._id)}
-                    disabled={loadingAiRubric[sub._id]}
-                    leftIcon={<Sparkles className={`w-3.5 h-3.5 text-purple-500 ${loadingAiRubric[sub._id] ? 'animate-spin' : ''}`} />}
-                    className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-xs font-semibold"
-                  >
-                    {loadingAiRubric[sub._id] ? 'Evaluating with AI Rubric...' : '🤖 AI Rubric Grade & Feedback'}
-                  </Button>
-
-                  <Button size="sm" onClick={() => handleGradeSubmission(sub._id)}>
-                    Save Grade &amp; Award Points
-                  </Button>
-                </div>
-
-                {/* AI Rubric Breakdown Card if generated */}
-                {aiRubricData[sub._id] && (
-                  <div className="p-3.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/60 space-y-2.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                        AI Rubric Evaluation Breakdown
+                  {hasModerateSimilarity && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 flex items-center justify-between text-xs text-amber-900 dark:text-amber-300">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                        Moderate similarity ({sub.plagiarismScore}%) detected with {sub.matchedStudentName}
                       </span>
-                      <Badge variant="purple" className="font-bold">
-                        Suggested: {aiRubricData[sub._id].suggestedMarks} / {aiRubricData[sub._id].maxMarks} marks
-                      </Badge>
+                      <Badge variant="amber">{sub.plagiarismScore}% Similarity</Badge>
                     </div>
+                  )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {aiRubricData[sub._id].rubricBreakdown.map((crit, crIdx) => (
-                        <div key={crIdx} className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-purple-100 dark:border-purple-900/40 space-y-0.5">
-                          <div className="flex items-center justify-between font-semibold text-gray-800 dark:text-gray-200">
-                            <span className="truncate">{crit.criterion}</span>
-                            <span className="text-purple-600 shrink-0 ml-1">{crit.score}/{crit.maxScore}</span>
-                          </div>
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">{crit.comments}</p>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-slate-800">
+                    <Input
+                      label={`Marks (out of ${gradingAssignment?.maxMarks || 100})`}
+                      type="number"
+                      defaultValue={sub.marksObtained ?? ''}
+                      onChange={(e) =>
+                        setGradingMarks({ ...gradingMarks, [sub._id]: parseInt(e.target.value) || 0 })
+                      }
+                    />
 
-                    {aiRubricData[sub._id].strengths.length > 0 && (
-                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                        ✅ <strong>Key Strengths:</strong> {aiRubricData[sub._id].strengths.join(' • ')}
-                      </p>
-                    )}
+                    <Input
+                      label="Instructor Feedback"
+                      placeholder="e.g. Excellent logic and comments."
+                      defaultValue={sub.feedback || ''}
+                      onChange={(e) =>
+                        setGradingFeedback({ ...gradingFeedback, [sub._id]: e.target.value })
+                      }
+                    />
                   </div>
-                )}
-              </Card>
-            ))
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-slate-800">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => gradingAssignment && handleAiRubricGrade(gradingAssignment._id, sub._id)}
+                      disabled={loadingAiRubric[sub._id]}
+                      leftIcon={<Sparkles className={`w-3.5 h-3.5 text-purple-500 ${loadingAiRubric[sub._id] ? 'animate-spin' : ''}`} />}
+                      className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-xs font-semibold"
+                    >
+                      {loadingAiRubric[sub._id] ? 'Evaluating with AI Rubric...' : '🤖 AI Rubric Grade & Feedback'}
+                    </Button>
+
+                    <Button size="sm" onClick={() => handleGradeSubmission(sub._id)}>
+                      Save Grade &amp; Award Points
+                    </Button>
+                  </div>
+
+                  {/* AI Rubric Breakdown Card if generated */}
+                  {aiRubricData[sub._id] && (
+                    <div className="p-3.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/60 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                          AI Rubric Evaluation Breakdown
+                        </span>
+                        <Badge variant="purple" className="font-bold">
+                          Suggested: {aiRubricData[sub._id].suggestedMarks} / {aiRubricData[sub._id].maxMarks} marks
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {aiRubricData[sub._id].rubricBreakdown.map((crit, crIdx) => (
+                          <div key={crIdx} className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-purple-100 dark:border-purple-900/40 space-y-0.5">
+                            <div className="flex items-center justify-between font-semibold text-gray-800 dark:text-gray-200">
+                              <span className="truncate">{crit.criterion}</span>
+                              <span className="text-purple-600 shrink-0 ml-1">{crit.score}/{crit.maxScore}</span>
+                            </div>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">{crit.comments}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {aiRubricData[sub._id].strengths.length > 0 && (
+                        <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                          ✅ <strong>Key Strengths:</strong> {aiRubricData[sub._id].strengths.join(' • ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })
           )}
         </div>
       </Modal>

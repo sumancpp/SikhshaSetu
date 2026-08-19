@@ -20,8 +20,17 @@ export class ForumService {
       description: string;
       tags?: string[];
       attachments?: string[];
+      audience?: 'ALL' | 'DEPARTMENT_ONLY' | 'FACULTY_AND_PARENTS' | 'FACULTY_ONLY';
+      targetDepartment?: string;
     }
   ): Promise<IForumPost> {
+    const audience = data.audience || 'ALL';
+
+    // Students cannot post to restricted Faculty/Parents boards
+    if (authorRole === 'STUDENT' && (audience === 'FACULTY_AND_PARENTS' || audience === 'FACULTY_ONLY')) {
+      throw new Error('Students are not authorized to post in the Faculty & Parents exclusive board.');
+    }
+
     let classId = data.classId;
     if (!classId && data.subjectId) {
       const subject = await Subject.findById(data.subjectId);
@@ -29,7 +38,7 @@ export class ForumService {
         classId = typeof subject.classId === 'object' ? (subject.classId as any)._id : subject.classId;
       }
     }
-    if (!classId) {
+    if (!classId && audience !== 'FACULTY_AND_PARENTS') {
       const userMember = await ClassMember.findOne({ userId: authorId });
       if (userMember) {
         classId = userMember.classId.toString();
@@ -41,6 +50,8 @@ export class ForumService {
       classId: classId || undefined,
       authorId,
       authorRole,
+      audience,
+      targetDepartment: data.targetDepartment || '',
       tags: data.tags || [],
       attachments: data.attachments || [],
     });
@@ -56,7 +67,7 @@ export class ForumService {
       emitToClass(classId, 'forum:post-created', populated);
     }
 
-    return populated || post;
+    return (populated || post) as IForumPost;
   }
 
   static async getPosts(
@@ -69,9 +80,38 @@ export class ForumService {
       sortBy?: 'newest' | 'upvotes' | 'answers';
       page?: number;
       limit?: number;
+      audience?: 'ALL' | 'DEPARTMENT_ONLY' | 'FACULTY_AND_PARENTS' | 'FACULTY_ONLY';
+      department?: string;
+      userRole?: UserRole;
+      userDepartment?: string;
     } = {}
   ): Promise<{ posts: any[]; total: number; page: number; pages: number }> {
     const filterQuery: any = { isHidden: false };
+
+    // Role-based privacy enforcement
+    if (options.userRole === 'STUDENT') {
+      // Students can NEVER see Faculty/Parents exclusive posts
+      filterQuery.audience = { $nin: ['FACULTY_AND_PARENTS', 'FACULTY_ONLY'] };
+
+      // Department isolation: If post is department-specific, only show if student belongs to that department
+      if (options.userDepartment) {
+        filterQuery.$and = filterQuery.$and || [];
+        filterQuery.$and.push({
+          $or: [
+            { audience: 'ALL' },
+            { audience: 'DEPARTMENT_ONLY', targetDepartment: { $in: [options.userDepartment, ''] } },
+            { targetDepartment: { $exists: false } },
+            { targetDepartment: '' },
+          ],
+        });
+      }
+    } else if (options.audience) {
+      filterQuery.audience = options.audience;
+    }
+
+    if (options.department) {
+      filterQuery.targetDepartment = options.department;
+    }
 
     if (options.classId) filterQuery.classId = options.classId;
     if (options.subjectId) filterQuery.subjectId = options.subjectId;
@@ -121,7 +161,7 @@ export class ForumService {
     };
   }
 
-  static async getPostDetail(postId: string, currentUserId?: string): Promise<any> {
+  static async getPostDetail(postId: string, currentUserId?: string, userRole?: UserRole): Promise<any> {
     const post = await ForumPost.findById(postId)
       .populate('authorId', 'name email avatar role department points')
       .populate('subjectId', 'name code')
@@ -129,6 +169,14 @@ export class ForumService {
 
     if (!post || post.isHidden) {
       throw new Error('Discussion post not found.');
+    }
+
+    // Role-based authorization for details
+    if (
+      userRole === 'STUDENT' &&
+      (post.audience === 'FACULTY_AND_PARENTS' || post.audience === 'FACULTY_ONLY')
+    ) {
+      throw new Error('You do not have authorization to view the Faculty & Parents discussion board.');
     }
 
     const answers = await ForumAnswer.find({ postId })

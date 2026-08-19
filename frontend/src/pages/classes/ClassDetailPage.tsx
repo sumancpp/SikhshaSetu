@@ -15,6 +15,8 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Breadcrumbs } from '../../components/layout/Breadcrumbs';
+import { ClassCommentsTab } from '../../components/classes/ClassCommentsTab';
+import { ClassAttendanceTab } from '../../components/classes/ClassAttendanceTab';
 import {
   BookOpen,
   Users,
@@ -25,6 +27,8 @@ import {
   ArrowRight,
   GraduationCap,
   Shield,
+  MessageSquare,
+  MapPin,
 } from 'lucide-react';
 
 export const ClassDetailPage: React.FC = () => {
@@ -219,11 +223,13 @@ export const ClassDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs: Subjects vs Members */}
+      {/* Tabs: Subjects, Comments, Attendance, Members */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-slate-800 pb-2">
         <Tabs
           tabs={[
             { id: 'subjects', label: 'Subjects Curricula', count: subjects.length, icon: <BookOpen className="w-4 h-4" /> },
+            { id: 'comments', label: 'Comments & Inquiries', icon: <MessageSquare className="w-4 h-4" /> },
+            { id: 'attendance', label: 'Live Attendance', icon: <MapPin className="w-4 h-4" /> },
             { id: 'members', label: 'Class Members', count: members.length, icon: <Users className="w-4 h-4" /> },
           ]}
           activeTab={activeTab}
@@ -301,6 +307,16 @@ export const ClassDetailPage: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Tab Content: Comments */}
+      {activeTab === 'comments' && (
+        <ClassCommentsTab classId={classData._id} members={members} />
+      )}
+
+      {/* Tab Content: Attendance */}
+      {activeTab === 'attendance' && (
+        <ClassAttendanceTab classId={classData._id} className={classData.name} />
       )}
 
       {/* Tab Content: Members */}

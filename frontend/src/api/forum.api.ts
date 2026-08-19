@@ -10,6 +10,8 @@ export const forumApi = {
     filter?: string;
     sortBy?: string;
     page?: number;
+    audience?: string;
+    department?: string;
   }): Promise<{ success: boolean; data: { posts: ForumPost[]; total: number; page: number; pages: number } }> => {
     const res = await apiClient.get('/forum/posts', { params });
     return res.data;

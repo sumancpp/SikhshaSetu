@@ -17,7 +17,7 @@ export class ForumController {
 
   static async getPosts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { classId, subjectId, search, tag, filter, sortBy, page, limit } = req.query;
+      const { classId, subjectId, search, tag, filter, sortBy, page, limit, audience, department } = req.query;
       const result = await ForumService.getPosts({
         classId: classId as string,
         subjectId: subjectId as string,
@@ -27,6 +27,10 @@ export class ForumController {
         sortBy: sortBy as any,
         page: page ? Number(page) : 1,
         limit: limit ? Number(limit) : 20,
+        audience: audience as any,
+        department: department as string,
+        userRole: req.user?.role,
+        userDepartment: req.user?.department,
       });
 
       res.status(200).json({
@@ -41,7 +45,7 @@ export class ForumController {
   static async getPostById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const currentUserId = req.user?.id;
-      const detail = await ForumService.getPostDetail(req.params.id, currentUserId);
+      const detail = await ForumService.getPostDetail(req.params.id, currentUserId, req.user?.role);
       res.status(200).json({
         success: true,
         data: detail,

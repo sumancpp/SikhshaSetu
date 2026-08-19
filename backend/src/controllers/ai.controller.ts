@@ -96,4 +96,47 @@ export class AiController {
       next(err);
     }
   }
+
+  static async checkPlagiarism(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { assignmentId } = req.body;
+      if (!assignmentId) {
+        res.status(400).json({
+          success: false,
+          message: 'Assignment ID is required.',
+        });
+        return;
+      }
+
+      const report = await AiService.detectPlagiarismAndDuplicates(assignmentId);
+      res.status(200).json({
+        success: true,
+        message: `Plagiarism scan completed. Found ${report.duplicatesDetectedCount} duplicate/suspicious submissions.`,
+        data: report,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async getPlagiarismReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { assignmentId } = req.params;
+      if (!assignmentId) {
+        res.status(400).json({
+          success: false,
+          message: 'Assignment ID is required.',
+        });
+        return;
+      }
+
+      const report = await AiService.getPlagiarismReport(assignmentId);
+      res.status(200).json({
+        success: true,
+        data: report,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }

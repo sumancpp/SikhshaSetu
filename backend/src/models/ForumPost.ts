@@ -1,6 +1,8 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 import { UserRole } from './User.js';
 
+export type ForumAudience = 'ALL' | 'DEPARTMENT_ONLY' | 'FACULTY_AND_PARENTS' | 'FACULTY_ONLY';
+
 export interface IForumPost extends Document {
   classId?: Types.ObjectId;
   subjectId?: Types.ObjectId; // If null, class-wide or general discussion
@@ -10,6 +12,9 @@ export interface IForumPost extends Document {
   attachments: string[];
   authorId: Types.ObjectId;
   authorRole: UserRole;
+  audience: ForumAudience;
+  targetDepartment?: string;
+  allowedRoles?: string[];
   upvotesCount: number;
   downvotesCount: number;
   answersCount: number;
@@ -29,7 +34,15 @@ const ForumPostSchema = new Schema<IForumPost>(
     tags: [{ type: String, lowercase: true, trim: true }],
     attachments: [{ type: String }],
     authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    authorRole: { type: String, enum: ['ADMIN', 'FACULTY', 'STUDENT'], required: true },
+    authorRole: { type: String, enum: ['ADMIN', 'FACULTY', 'STUDENT', 'PARENT'], required: true },
+    audience: {
+      type: String,
+      enum: ['ALL', 'DEPARTMENT_ONLY', 'FACULTY_AND_PARENTS', 'FACULTY_ONLY'],
+      default: 'ALL',
+      index: true,
+    },
+    targetDepartment: { type: String, default: '', index: true },
+    allowedRoles: [{ type: String, enum: ['ADMIN', 'FACULTY', 'STUDENT', 'PARENT'] }],
     upvotesCount: { type: Number, default: 0 },
     downvotesCount: { type: Number, default: 0 },
     answersCount: { type: Number, default: 0 },
