@@ -47,6 +47,7 @@ export const StudentAttendanceScannerModal: React.FC<StudentAttendanceScannerMod
 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const isScanningRef = useRef(false);
+  const isScanningPausedRef = useRef(false);
   const coordsRef = useRef<{ latitude: number; longitude: number; accuracy: number } | null>(null);
 
   const { success, error, info } = useToast();
@@ -94,10 +95,14 @@ export const StudentAttendanceScannerModal: React.FC<StudentAttendanceScannerMod
 
   // Submit attendance logic
   const submitWithData = async (sessionId: string, token: string) => {
+    if (isScanningPausedRef.current) return;
+    isScanningPausedRef.current = true;
+
     const currentCoords = coordsRef.current;
     if (!currentCoords) {
       error('GPS Required', 'Waiting for mobile GPS location lock. Please allow location access.');
       acquireLocation();
+      isScanningPausedRef.current = false;
       return;
     }
 
@@ -120,7 +125,10 @@ export const StudentAttendanceScannerModal: React.FC<StudentAttendanceScannerMod
         if (onSuccess) onSuccess(res.data);
       }
     } catch (err: any) {
-      error('Attendance Verification Failed', err.response?.data?.message || err.message || 'Verification failed');
+      error('Attendance Verification', err.response?.data?.message || err.message || 'Verification failed');
+      setTimeout(() => {
+        isScanningPausedRef.current = false;
+      }, 3000);
     } finally {
       setSubmitting(false);
     }
@@ -149,6 +157,7 @@ export const StudentAttendanceScannerModal: React.FC<StudentAttendanceScannerMod
           aspectRatio: 1.0,
         },
         (decodedText) => {
+          if (isScanningPausedRef.current) return;
           // Detected a QR code!
           try {
             let parsedSessionId = '';

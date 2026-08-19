@@ -464,11 +464,13 @@ export const AttendanceHubPage: React.FC = () => {
               <select
                 value={radiusMeters}
                 onChange={(e) => setRadiusMeters(Number(e.target.value))}
-                className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-gray-800 dark:text-gray-200"
+                className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs text-gray-800 dark:text-gray-200 font-medium"
               >
-                <option value={50}>50 meters (Classroom / Lab)</option>
-                <option value={100}>100 meters (Lecture Hall)</option>
-                <option value={200}>200 meters (Auditorium / Complex)</option>
+                <option value={100}>100 meters (Classroom / Lab)</option>
+                <option value={250}>250 meters (Department / Floor)</option>
+                <option value={500}>500 meters (Campus Building / Wi-Fi Offset ⭐)</option>
+                <option value={1000}>1000 meters (1 km - Campus Wide / Testing)</option>
+                <option value={2000}>2000 meters (2 km - Extended Perimeter)</option>
               </select>
             </div>
 

@@ -240,16 +240,7 @@ export class AttendanceService {
       );
     }
 
-    // 2. Check if student already submitted for this session
-    const existing = await AttendanceRecord.findOne({
-      sessionId: session._id,
-      studentId: new Types.ObjectId(studentId),
-    });
-    if (existing) {
-      throw new Error('Attendance already recorded for this session.');
-    }
-
-    // 3. Geolocation Distance Verification (Haversine Formula)
+    // 2. Geolocation Distance Verification (Haversine Formula)
     const distanceMeters = this.getHaversineDistanceMeters(
       session.centerLatitude,
       session.centerLongitude,
@@ -261,35 +252,86 @@ export class AttendanceService {
     const verificationStatus = isWithinRadius ? 'PRESENT' : 'OUT_OF_RANGE';
     const pointsToAward = isWithinRadius ? 5 : 0;
 
-    const record = await AttendanceRecord.create({
+    // 3. Check if student already submitted for this session
+    const existing = await AttendanceRecord.findOne({
       sessionId: session._id,
-      classId: session.classId,
-      subjectId: session.subjectId,
       studentId: new Types.ObjectId(studentId),
-      scannedAt: new Date(),
-      latitude: data.latitude,
-      longitude: data.longitude,
-      accuracyMeters: data.accuracyMeters || 0,
-      distanceFromCenter: distanceMeters,
-      verificationStatus,
-      deviceFingerprint: data.deviceFingerprint || '',
-      ipAddress: data.ipAddress || '',
-      pointsAwarded: pointsToAward,
     });
 
-    // Increment attendance count if present
-    if (isWithinRadius) {
-      session.attendanceCount = (session.attendanceCount || 0) + 1;
-      await session.save();
+    let record: IAttendanceRecord;
 
-      // Award attendance bonus points
-      await PointsService.awardPoints(
-        studentId,
-        'CHALLENGE',
-        5,
-        `Verified In-Class Attendance: "${session.title}"`,
-        record._id
-      );
+    if (existing) {
+      if (existing.verificationStatus === 'PRESENT') {
+        throw new Error('Attendance is already verified and recorded PRESENT for this session.');
+      }
+
+      // If previously OUT_OF_RANGE and now within radius, update to PRESENT!
+      if (isWithinRadius) {
+        existing.verificationStatus = 'PRESENT';
+        existing.scannedAt = new Date();
+        existing.latitude = data.latitude;
+        existing.longitude = data.longitude;
+        existing.accuracyMeters = data.accuracyMeters || 0;
+        existing.distanceFromCenter = distanceMeters;
+        existing.pointsAwarded = 5;
+        await existing.save();
+
+        session.attendanceCount = (session.attendanceCount || 0) + 1;
+        await session.save();
+
+        await PointsService.awardPoints(
+          studentId,
+          'CHALLENGE',
+          5,
+          `Verified In-Class Attendance: "${session.title}"`,
+          existing._id
+        );
+
+        record = existing;
+      } else {
+        // Still out of range
+        existing.scannedAt = new Date();
+        existing.latitude = data.latitude;
+        existing.longitude = data.longitude;
+        existing.accuracyMeters = data.accuracyMeters || 0;
+        existing.distanceFromCenter = distanceMeters;
+        await existing.save();
+
+        throw new Error(
+          `Location is ${Math.round(distanceMeters)}m away from classroom (Allowed: ${session.allowedRadiusMeters}m). Please ensure your mobile location is on or ask teacher to adjust radius for Wi-Fi offset.`
+        );
+      }
+    } else {
+      record = await AttendanceRecord.create({
+        sessionId: session._id,
+        classId: session.classId,
+        subjectId: session.subjectId,
+        studentId: new Types.ObjectId(studentId),
+        scannedAt: new Date(),
+        latitude: data.latitude,
+        longitude: data.longitude,
+        accuracyMeters: data.accuracyMeters || 0,
+        distanceFromCenter: distanceMeters,
+        verificationStatus,
+        deviceFingerprint: data.deviceFingerprint || '',
+        ipAddress: data.ipAddress || '',
+        pointsAwarded: pointsToAward,
+      });
+
+      // Increment attendance count if present
+      if (isWithinRadius) {
+        session.attendanceCount = (session.attendanceCount || 0) + 1;
+        await session.save();
+
+        // Award attendance bonus points
+        await PointsService.awardPoints(
+          studentId,
+          'CHALLENGE',
+          5,
+          `Verified In-Class Attendance: "${session.title}"`,
+          record._id
+        );
+      }
     }
 
     const populatedRecord = await AttendanceRecord.findById(record._id).populate(
