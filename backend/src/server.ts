@@ -30,6 +30,7 @@ app.use(
 // Explicit CORS
 const allowedOrigins = [
   env.FRONTEND_URL,
+  'https://sikhshasetu-frontend.onrender.com',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:5174',
