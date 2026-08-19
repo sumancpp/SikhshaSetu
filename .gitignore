@@ -1,0 +1,20 @@
+# Root Level Ignore
+
+# Environment Variables & Secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies
+**/node_modules/
+
+# Build Artifacts
+**/dist/
+**/build/
+
+# Uploaded Media and Temp files
+backend/uploads/*
+!backend/uploads/.gitkeep
+**/*.log
+**/.DS_Store
+Thumbs.db

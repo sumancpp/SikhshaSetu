@@ -1,0 +1,40 @@
+import { Router } from 'express';
+import authRoutes from './auth.routes.js';
+import userRoutes from './user.routes.js';
+import classRoutes from './class.routes.js';
+import subjectRoutes from './subject.routes.js';
+import materialRoutes from './material.routes.js';
+import assignmentRoutes from './assignment.routes.js';
+import quizRoutes from './quiz.routes.js';
+import challengeRoutes from './challenge.routes.js';
+import leaderboardRoutes from './leaderboard.routes.js';
+import forumRoutes from './forum.routes.js';
+import notificationRoutes from './notification.routes.js';
+import reportRoutes from './report.routes.js';
+import analyticsRoutes from './analytics.routes.js';
+import searchRoutes from './search.routes.js';
+import aiRoutes from './ai.routes.js';
+import codeExecutionRoutes from './codeExecution.routes.js';
+import arenaRoutes from './arena.routes.js';
+
+const apiRouter = Router();
+
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/users', userRoutes);
+apiRouter.use('/classes', classRoutes);
+apiRouter.use('/subjects', subjectRoutes);
+apiRouter.use('/materials', materialRoutes);
+apiRouter.use('/assignments', assignmentRoutes);
+apiRouter.use('/quizzes', quizRoutes);
+apiRouter.use('/challenges', challengeRoutes);
+apiRouter.use('/leaderboard', leaderboardRoutes);
+apiRouter.use('/forum', forumRoutes);
+apiRouter.use('/notifications', notificationRoutes);
+apiRouter.use('/reports', reportRoutes);
+apiRouter.use('/analytics', analyticsRoutes);
+apiRouter.use('/search', searchRoutes);
+apiRouter.use('/ai', aiRoutes);
+apiRouter.use('/code', codeExecutionRoutes);
+apiRouter.use('/arena', arenaRoutes);
+
+export default apiRouter;

@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: 249 250 251;
+    --bg-surface: 255 255 255;
+    --border-color: 229 231 235;
+    --text-primary: 17 24 39;
+    --text-muted: 107 114 128;
+  }
+
+  .dark {
+    --bg-primary: 11 15 25;
+    --bg-surface: 15 23 42;
+    --border-color: 51 65 85;
+    --text-primary: 243 244 246;
+    --text-muted: 156 163 175;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply font-sans antialiased text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-[#0b0f19] transition-colors duration-200;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"]:disabled,
+  button[disabled] {
+    cursor: not-allowed;
+  }
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-700 rounded-full hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors;
+}
+
+/* Card hover animation */
+.card-hover {
+  @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:hover:shadow-slate-800/80;
+}
+
+/* Subtle glassmorphism */
+.glass {
+  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-gray-200/80 dark:border-slate-800/80;
+}
+
+@keyframes progress {
+  0% {
+    width: 0%;
+    transform: translateX(-100%);
+  }
+  50% {
+    width: 70%;
+    transform: translateX(20%);
+  }
+  100% {
+    width: 100%;
+    transform: translateX(100%);
+  }
+}
