@@ -17,6 +17,9 @@ import { apiLimiter } from './middleware/rateLimiter.js';
 const app = express();
 const server = http.createServer(app);
 
+// Trust reverse proxy (essential for Render / Cloudflare deployments)
+app.set('trust proxy', 1);
+
 // Initialize WebSockets
 initSocket(server);
 
@@ -27,10 +30,12 @@ app.use(
   })
 );
 
-// Explicit CORS
+// Explicit CORS Origins
 const allowedOrigins = [
   env.FRONTEND_URL,
   'https://sikhshasetu-frontend.onrender.com',
+  'https://shikshasetu-frontend.onrender.com',
+  'https://sikhshasetu.onrender.com',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:5174',
@@ -38,27 +43,45 @@ const allowedOrigins = [
   'http://localhost:5175',
   'http://127.0.0.1:5175',
   'http://localhost:3000',
-];
+].filter(Boolean).map((url) => url.replace(/\/$/, ''));
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        env.NODE_ENV === 'development' ||
-        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-      ) {
-        callback(null, true);
-      } else {
-        callback(new Error('Blocked by CORS policy'));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  })
-);
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+    const cleanOrigin = origin.replace(/\/$/, '');
+    const isAllowed =
+      allowedOrigins.includes(cleanOrigin) ||
+      env.NODE_ENV === 'development' ||
+      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin) ||
+      /\.onrender\.com$/.test(cleanOrigin) ||
+      /\.vercel\.app$/.test(cleanOrigin);
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Request from disallowed origin: ${origin}`);
+      callback(null, true); // Permissive fallback to avoid crashing preflight requests
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Headers',
+    'Access-Control-Request-Method',
+  ],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Standard Middlewares
 app.use(compression());

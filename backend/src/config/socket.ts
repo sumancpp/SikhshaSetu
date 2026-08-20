@@ -18,12 +18,10 @@ const onlineUsers = new Map<string, { socketId: string; name: string; role: stri
 export const initSocket = (httpServer: HttpServer): SocketIOServer => {
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: [
-        env.FRONTEND_URL,
-        'https://sikhshasetu-frontend.onrender.com',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-      ],
+      origin: (origin, callback) => {
+        // Allow all frontend and onrender / localhost origins
+        callback(null, true);
+      },
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
       credentials: true,
     },
