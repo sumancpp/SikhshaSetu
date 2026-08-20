@@ -7,7 +7,7 @@ export const registerSchema = z.object({
       email: z.string().email('Please enter a valid email address'),
       password: z.string().min(6, 'Password must be at least 6 characters'),
       confirmPassword: z.string().optional(),
-      role: z.enum(['FACULTY', 'STUDENT']).optional().default('STUDENT'),
+      role: z.enum(['ADMIN', 'FACULTY', 'STUDENT', 'PARENT']).optional().default('STUDENT'),
       department: z.string().optional(),
       studentId: z.string().optional(),
       avatar: z.string().optional(),
