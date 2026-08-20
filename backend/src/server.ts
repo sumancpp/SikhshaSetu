@@ -131,25 +131,30 @@ import { SYSTEM_ACHIEVEMENTS } from './constants/achievements.js';
 import { seedDatabase } from './scripts/seed.js';
 
 export const startServer = async () => {
-  await connectDB();
-
-  // Ensure system achievements/badges exist for rewarding users
-  const userCount = await User.countDocuments();
-  if (userCount === 0) {
-    console.log('🌱 Empty database detected. Seeding full demo dataset...');
-    await seedDatabase();
-  } else {
-    const achievementCount = await Achievement.countDocuments();
-    if (achievementCount === 0) {
-      console.log('🏆 Initializing system achievements/badges...');
-      await Achievement.insertMany(SYSTEM_ACHIEVEMENTS);
-    }
-  }
-
-  server.listen(PORT, () => {
+  // Start server listening FIRST so cloud hosts (Render, Railway, etc.) detect an open port immediately
+  server.listen(PORT, async () => {
     console.log(`\n🚀 ShikshaSetu Server running on http://localhost:${PORT}`);
     console.log(`🌐 Environment: ${env.NODE_ENV}`);
     console.log(`🔗 Frontend Allowed Origin: ${env.FRONTEND_URL}\n`);
+
+    try {
+      await connectDB();
+
+      // Ensure system achievements/badges exist for rewarding users
+      const userCount = await User.countDocuments();
+      if (userCount === 0) {
+        console.log('🌱 Empty database detected. Seeding full demo dataset...');
+        await seedDatabase();
+      } else {
+        const achievementCount = await Achievement.countDocuments();
+        if (achievementCount === 0) {
+          console.log('🏆 Initializing system achievements/badges...');
+          await Achievement.insertMany(SYSTEM_ACHIEVEMENTS);
+        }
+      }
+    } catch (err) {
+      console.error('⚠️ Database initialization error:', err);
+    }
   });
 };
 

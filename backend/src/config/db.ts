@@ -27,8 +27,8 @@ export const connectDB = async (): Promise<void> => {
     console.log(`✅ MongoDB Connected successfully to: ${mongoose.connection.host}`);
   } catch (error) {
     console.error('❌ MongoDB Connection Error:', error);
-    // If standard URI failed, try falling back to memory server
-    if (!mongod) {
+    // If standard URI failed and we are in development, try falling back to memory server
+    if (!mongod && env.NODE_ENV === 'development') {
       console.log('🔄 Attempting fallback to MongoMemoryServer...');
       try {
         mongod = await MongoMemoryServer.create({
@@ -42,7 +42,6 @@ export const connectDB = async (): Promise<void> => {
         console.error('❌ Fallback MongoDB Connection failed:', fallbackErr);
       }
     }
-    process.exit(1);
   }
 };
 
