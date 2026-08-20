@@ -103,16 +103,24 @@ app.use(errorHandler);
 const PORT = parseInt(env.PORT, 10) || 5000;
 
 import { Achievement } from './models/Achievement.js';
+import { User } from './models/User.js';
 import { SYSTEM_ACHIEVEMENTS } from './constants/achievements.js';
+import { seedDatabase } from './scripts/seed.js';
 
 export const startServer = async () => {
   await connectDB();
 
   // Ensure system achievements/badges exist for rewarding users
-  const achievementCount = await Achievement.countDocuments();
-  if (achievementCount === 0) {
-    console.log('🏆 Initializing system achievements/badges...');
-    await Achievement.insertMany(SYSTEM_ACHIEVEMENTS);
+  const userCount = await User.countDocuments();
+  if (userCount === 0) {
+    console.log('🌱 Empty database detected. Seeding full demo dataset...');
+    await seedDatabase();
+  } else {
+    const achievementCount = await Achievement.countDocuments();
+    if (achievementCount === 0) {
+      console.log('🏆 Initializing system achievements/badges...');
+      await Achievement.insertMany(SYSTEM_ACHIEVEMENTS);
+    }
   }
 
   server.listen(PORT, () => {
