@@ -11,6 +11,7 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 // General API limiter
@@ -24,6 +25,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 // Forum post / creation limiter
@@ -35,4 +37,7 @@ export const forumLimiter = rateLimit({
     message: 'You are posting too quickly. Please wait a moment.',
     code: 'RATE_LIMIT_FORUM',
   },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
