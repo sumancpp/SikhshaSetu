@@ -150,7 +150,7 @@ export const ClassesPage: React.FC = () => {
             Join by Code
           </Button>
 
-          {user?.role === 'ADMIN' && (
+          {(user?.role === 'ADMIN' || user?.role === 'FACULTY') && (
             <Button
               size="sm"
               onClick={() => setIsCreateOpen(true)}

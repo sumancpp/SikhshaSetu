@@ -40,7 +40,7 @@ export const requireClassMember = async (
       return;
     }
 
-    if (req.user?.role === 'ADMIN') {
+    if (req.user?.role === 'ADMIN' || req.user?.role === 'FACULTY') {
       next();
       return;
     }

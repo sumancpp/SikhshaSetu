@@ -19,7 +19,7 @@ export class ClassService {
   }
 
   static async createClass(
-    adminId: string,
+    creatorId: string,
     data: {
       name: string;
       description?: string;
@@ -35,14 +35,17 @@ export class ClassService {
     const newClass = await Class.create({
       ...data,
       code,
-      createdBy: adminId,
+      createdBy: creatorId,
     });
 
-    // Auto-add Admin as class member
+    const user = await User.findById(creatorId);
+    const creatorRole = user?.role || 'FACULTY';
+
+    // Auto-add Creator as class member
     await ClassMember.create({
       classId: newClass._id,
-      userId: adminId,
-      role: 'ADMIN',
+      userId: creatorId,
+      role: creatorRole,
     });
 
     emitGlobal('class:created', newClass);

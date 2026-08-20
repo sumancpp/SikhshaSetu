@@ -14,14 +14,14 @@ const router = Router();
 
 router.use(requireAuth);
 
-router.post('/', requireRole('ADMIN'), validateRequest(createClassSchema), ClassController.createClass);
+router.post('/', requireRole('ADMIN', 'FACULTY'), validateRequest(createClassSchema), ClassController.createClass);
 router.get('/', ClassController.getClasses);
 router.post('/join', validateRequest(joinClassSchema), ClassController.joinClass);
 
 router.get('/:id', requireClassMember, ClassController.getClassById);
-router.patch('/:id', requireRole('ADMIN'), validateRequest(updateClassSchema), ClassController.updateClass);
-router.post('/:id/regenerate-code', requireRole('ADMIN'), ClassController.regenerateCode);
-router.post('/:id/invite-faculty', requireRole('ADMIN'), validateRequest(inviteFacultySchema), ClassController.inviteFaculty);
-router.delete('/:id/members/:userId', requireRole('ADMIN'), ClassController.removeMember);
+router.patch('/:id', requireRole('ADMIN', 'FACULTY'), validateRequest(updateClassSchema), ClassController.updateClass);
+router.post('/:id/regenerate-code', requireRole('ADMIN', 'FACULTY'), ClassController.regenerateCode);
+router.post('/:id/invite-faculty', requireRole('ADMIN', 'FACULTY'), validateRequest(inviteFacultySchema), ClassController.inviteFaculty);
+router.delete('/:id/members/:userId', requireRole('ADMIN', 'FACULTY'), ClassController.removeMember);
 
 export default router;
