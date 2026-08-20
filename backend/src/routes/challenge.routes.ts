@@ -25,7 +25,7 @@ router.get('/:id/leaderboard', ChallengeController.getChallengeLeaderboard);
 
 router.post(
   '/:id/submit',
-  requireRole('STUDENT'),
+  requireRole('STUDENT', 'FACULTY', 'ADMIN'),
   validateRequest(submitChallengeAttemptSchema),
   ChallengeController.submitChallenge
 );
