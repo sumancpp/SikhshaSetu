@@ -191,6 +191,30 @@ export class SubjectService {
         .sort({ createdAt: -1 });
     }
 
+    if (role === 'FACULTY') {
+      // Faculty sees subjects where they are primary faculty, co-faculty, OR a SubjectMember
+      const memberFilter: any = { userId };
+      if (classId) memberFilter.classId = classId;
+      const memberships = await SubjectMember.find(memberFilter);
+      const memberSubjectIds = memberships.map((m) => m.subjectId.toString());
+
+      const facultyFilter: any = {
+        isArchived: false,
+        $or: [
+          { primaryFacultyId: userId },
+          { coFaculties: userId },
+          { _id: { $in: memberSubjectIds } },
+        ],
+      };
+      if (classId) facultyFilter.classId = classId;
+
+      return Subject.find(facultyFilter)
+        .populate('classId', 'name code')
+        .populate('primaryFacultyId', 'name email avatar')
+        .sort({ createdAt: -1 });
+    }
+
+    // STUDENT (and all other roles) — based purely on SubjectMember enrollment
     const memberFilter: any = { userId };
     if (classId) memberFilter.classId = classId;
 
@@ -202,6 +226,7 @@ export class SubjectService {
       .populate('primaryFacultyId', 'name email avatar')
       .sort({ createdAt: -1 });
   }
+
 
   static async getSubjectWorkspace(subjectId: string, userId?: string, userRole?: string): Promise<any> {
     const subject = await Subject.findById(subjectId)

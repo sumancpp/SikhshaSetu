@@ -101,12 +101,25 @@ export const requireSubjectMember = async (
       return;
     }
 
+    // For students (and any other role), check SubjectMember enrollment
     const member = await SubjectMember.findOne({
       subjectId,
       userId: req.user?.id,
     });
 
     if (!member) {
+      // Final fallback: If this user is any kind of FACULTY, check if they have class membership in this subject's class
+      if (req.user?.role === 'FACULTY') {
+        const classId = subject.classId;
+        if (classId) {
+          const classMember = await ClassMember.findOne({ classId, userId: req.user?.id });
+          if (classMember) {
+            next();
+            return;
+          }
+        }
+      }
+
       res.status(403).json({
         success: false,
         message: 'Access denied. You are not enrolled in this subject.',
