@@ -121,10 +121,13 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
-      </Route>
 
+
+      </Route>
       {/* 404 Fallback */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+
+
   );
 };
